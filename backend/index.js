@@ -5,6 +5,9 @@ const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
+console.log('DEBUG - SUPABASE_URL exists:', !!process.env.SUPABASE_URL);
+console.log('DEBUG - SUPABASE_ANON_KEY exists:', !!process.env.SUPABASE_ANON_KEY);
+
 const app = express();
 app.use(cors());
 app.use(express.json());
