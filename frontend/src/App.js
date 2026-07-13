@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 function App() {
   const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +16,7 @@ function App() {
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/accommodation-types')
+    fetch(`${API_URL}/api/accommodation-types`)
       .then(res => res.json())
       .then(data => setAccommodationTypes(data.types))
       .catch(err => console.error(err));
@@ -30,7 +32,7 @@ function App() {
       type: typeFilter,
       chain: chainFilter
     });
-    fetch(`http://localhost:8000/api/hotels?${params}`)
+    fetch(`${API_URL}/api/hotels?${params}`)
       .then(res => res.json())
       .then(data => {
         setHotels(data.hotels);
@@ -39,7 +41,7 @@ function App() {
 
         const hotelIds = data.hotels.map(h => h.id).filter(Boolean);
         if (hotelIds.length > 0) {
-          fetch('http://localhost:8000/api/live-pricing', {
+          fetch(`${API_URL}/api/live-pricing`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ hotelIds })
