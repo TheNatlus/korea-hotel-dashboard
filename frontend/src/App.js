@@ -6,34 +6,85 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [minRating, setMinRating] = useState(0);
+  const [cityFilter, setCityFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [chainFilter, setChainFilter] = useState('all');
+  const [accommodationTypes, setAccommodationTypes] = useState([]);
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
+    fetch('http://localhost:8000/api/accommodation-types')
+      .then(res => res.json())
+      .then(data => setAccommodationTypes(data.types))
+      .catch(err => console.error(err));
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/hotels?page=${page}`)
+    const params = new URLSearchParams({
+      page,
+      search,
+      minRating,
+      city: cityFilter,
+      type: typeFilter,
+      chain: chainFilter
+    });
+    fetch(`http://localhost:8000/api/hotels?${params}`)
       .then(res => res.json())
       .then(data => {
         setHotels(data.hotels);
         setTotalCount(data.total);
         setLoading(false);
+
+        const hotelIds = data.hotels.map(h => h.id).filter(Boolean);
+        if (hotelIds.length > 0) {
+          fetch('http://localhost:8000/api/live-pricing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hotelIds })
+          })
+            .then(res => res.json())
+            .then(priceData => {
+              setHotels(prevHotels =>
+                prevHotels.map(h => ({
+                  ...h,
+                  price: priceData.prices[h.id]?.dailyRate || null,
+                  crossedOutRate: priceData.prices[h.id]?.crossedOutRate || null,
+                  discountPercentage: priceData.prices[h.id]?.discountPercentage || 0,
+                  bookingUrl: priceData.prices[h.id]?.landingURL || null
+                }))
+              );
+            })
+            .catch(err => console.error('Pricing fetch failed:', err));
+        }
       })
       .catch(err => {
         console.error(err);
         setLoading(false);
       });
-  }, [page]);
+  }, [page, search, minRating, cityFilter, typeFilter, chainFilter]);
 
-  const filtered = hotels.filter(h =>
-    h.name.toLowerCase().includes(search.toLowerCase()) &&
-    (h.rating || 0) >= minRating
-  );
+  useEffect(() => {
+    setPage(0);
+  }, [search, minRating, cityFilter, typeFilter, chainFilter]);
 
   return (
     <div className="app">
       <div className="header">
+        <div className="eyebrow">
+          {['all', 'seoul', 'busan', 'jeju'].map(c => (
+            <button
+              key={c}
+              className={`city-pill ${cityFilter === c ? 'active' : ''}`}
+              onClick={() => setCityFilter(c)}
+            >
+              {c === 'all' ? 'Nationwide' : c.charAt(0).toUpperCase() + c.slice(1)}
+            </button>
+          ))}
+        </div>
         <h1>🇰🇷 Korea Hotel Dashboard</h1>
-        <p>{totalCount} hotels in Seoul</p>
+        <p>{totalCount} properties indexed</p>
       </div>
 
       <div className="filters">
@@ -46,6 +97,7 @@ function App() {
         />
         <select
           className="rating-filter"
+          value={minRating}
           onChange={e => setMinRating(Number(e.target.value))}
         >
           <option value={0}>All Ratings</option>
@@ -53,38 +105,82 @@ function App() {
           <option value={8}>8+ Rating</option>
           <option value={9}>9+ Rating</option>
         </select>
+        <select
+          className="rating-filter"
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+        >
+          <option value="all">All Types</option>
+          {accommodationTypes.map(t => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select
+          className="rating-filter"
+          value={chainFilter}
+          onChange={e => setChainFilter(e.target.value)}
+        >
+          <option value="all">Chain or Independent</option>
+          <option value="chain">Chain Only</option>
+          <option value="independent">Independent Only</option>
+        </select>
       </div>
 
       {loading ? (
         <div className="loading">Loading hotels...</div>
       ) : (
         <>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Hotel Name</th>
-                <th>Address</th>
-                <th>City</th>
-                <th>Rating</th>
-                <th>Stars</th>
-                <th>Phone</th>
-                <th>Email</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((hotel, i) => (
-                <tr key={i}>
-                  <td>{hotel.name}</td>
-                  <td>{hotel.address}</td>
-                  <td>{hotel.city}</td>
-                  <td>{hotel.rating || 'N/A'}</td>
-                  <td>{'⭐'.repeat(hotel.stars) || 'N/A'}</td>
-                  <td>{hotel.phone}</td>
-                  <td>{hotel.email}</td>
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Hotel Name</th>
+                  <th>Type</th>
+                  <th>Chain</th>
+                  <th>Address</th>
+                  <th>City</th>
+                  <th>Rooms</th>
+                  <th>Stars</th>
+                  <th>Rating</th>
+                  <th>Reviews</th>
+                  <th>Price/Night</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {hotels.map((hotel, i) => (
+                  <tr key={i}>
+                    <td>
+                      {hotel.bookingUrl ? (
+                        <a href={hotel.bookingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                          {hotel.name}
+                        </a>
+                      ) : (
+                        hotel.name
+                      )}
+                    </td>
+                    <td>{hotel.accommodationType}</td>
+                    <td>{hotel.chainName}</td>
+                    <td>{hotel.address}</td>
+                    <td>{hotel.city}</td>
+                    <td className="numeric">{hotel.rooms}</td>
+                    <td><span className="star-badge">{hotel.stars}</span></td>
+                    <td><span className="rating-badge">{hotel.rating}</span></td>
+                    <td className="numeric">{hotel.reviews}</td>
+                    <td className="numeric">
+                      {hotel.price ? (
+                        <>
+                          ${hotel.price}
+                          {hotel.discountPercentage > 0 && (
+                            <span className="discount-badge">-{hotel.discountPercentage}%</span>
+                          )}
+                        </>
+                      ) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           <div className="pagination">
             <button onClick={() => setPage(p => p - 1)} disabled={page === 0}>← Prev</button>
