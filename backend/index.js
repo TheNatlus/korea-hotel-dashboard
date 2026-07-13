@@ -1,24 +1,64 @@
 console.log('Server starting...');
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
-const csv = require('csv-parser');
 const axios = require('axios');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-let hotels = [];
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
-console.log('Loading Korean hotels from CSV...');
-fs.createReadStream('../korea_hotels.csv')
-  .pipe(csv({
-    mapHeaders: ({ header }) => header.replace(/^\uFEFF/, '')
-  }))
-  .on('data', (row) => {
-    hotels.push({
+app.get('/api/hotels', async (req, res) => {
+  const page = parseInt(req.query.page) || 0;
+  const search = req.query.search || '';
+  const minRating = parseFloat(req.query.minRating) || 0;
+  const cityFilter = req.query.city || 'all';
+  const typeFilter = req.query.type || 'all';
+  const chainFilter = req.query.chain || 'all';
+  const perPage = 20;
+
+  try {
+    let query = supabase
+      .from('hotels')
+      .select('*', { count: 'exact' });
+
+    if (search) {
+      query = query.ilike('hotel_name', `%${search}%`);
+    }
+
+    if (minRating > 0) {
+      query = query.gte('rating_average', minRating);
+    }
+
+    if (cityFilter !== 'all') {
+      query = query.ilike('city', `%${cityFilter}%`);
+    }
+
+    if (typeFilter !== 'all') {
+      query = query.eq('accommodation_type', typeFilter);
+    }
+
+    if (chainFilter === 'chain') {
+      query = query.neq('chain_name', 'No Chain');
+    } else if (chainFilter === 'independent') {
+      query = query.eq('chain_name', 'No Chain');
+    }
+
+    const start = page * perPage;
+    const end = start + perPage - 1;
+    query = query.range(start, end);
+
+    const { data, count, error } = await query;
+
+    if (error) throw error;
+
+    const hotels = data.map(row => ({
       id: row.hotel_id,
       name: row.hotel_name,
       address: `${row.addressline1 || ''} ${row.addressline2 || ''}`.trim(),
@@ -38,50 +78,29 @@ fs.createReadStream('../korea_hotels.csv')
       chainName: row.chain_name || 'No Chain',
       phone: 'N/A',
       email: 'N/A',
-    });
-  })
-  .on('end', () => {
-    console.log(`Loaded ${hotels.length} Korean hotels`);
-  });
+    }));
 
-app.get('/api/hotels', (req, res) => {
-  const page = parseInt(req.query.page) || 0;
-  const search = (req.query.search || '').toLowerCase();
-  const minRating = parseFloat(req.query.minRating) || 0;
-  const cityFilter = req.query.city || 'all';
-  const typeFilter = req.query.type || 'all';
-  const chainFilter = req.query.chain || 'all';
-  const perPage = 20;
-
-  let filtered = hotels.filter(h => {
-    const matchesSearch = h.name.toLowerCase().includes(search);
-    const matchesRating = (h.rating || 0) >= minRating;
-    const matchesCity =
-      cityFilter === 'all' ||
-      (cityFilter === 'seoul' && h.city?.toLowerCase().includes('seoul')) ||
-      (cityFilter === 'busan' && h.city?.toLowerCase().includes('busan')) ||
-      (cityFilter === 'jeju' && h.city?.toLowerCase().includes('jeju'));
-    const matchesType =
-      typeFilter === 'all' || h.accommodationType === typeFilter;
-    const matchesChain =
-      chainFilter === 'all' ||
-      (chainFilter === 'chain' && h.chainName !== 'No Chain') ||
-      (chainFilter === 'independent' && h.chainName === 'No Chain');
-    return matchesSearch && matchesRating && matchesCity && matchesType && matchesChain;
-  });
-
-  const start = page * perPage;
-  const end = start + perPage;
-
-  res.json({
-    hotels: filtered.slice(start, end),
-    total: filtered.length
-  });
+    res.json({ hotels, total: count });
+  } catch (error) {
+    console.error('Supabase query error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch hotels' });
+  }
 });
 
-app.get('/api/accommodation-types', (req, res) => {
-  const types = [...new Set(hotels.map(h => h.accommodationType).filter(Boolean))];
-  res.json({ types });
+app.get('/api/accommodation-types', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('hotels')
+      .select('accommodation_type');
+
+    if (error) throw error;
+
+    const types = [...new Set(data.map(r => r.accommodation_type).filter(Boolean))];
+    res.json({ types });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ types: [] });
+  }
 });
 
 app.post('/api/live-pricing', async (req, res) => {
