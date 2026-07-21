@@ -197,6 +197,34 @@ body {
   color: #4fae8c;
 }
 
+.discount-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: rgba(201, 92, 92, 0.15);
+  color: #c95c5c;
+}
+
+.link-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  background: rgba(79, 174, 140, 0.1);
+  color: #4fae8c;
+  border: 1px solid rgba(79, 174, 140, 0.3);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.link-badge:hover {
+  background: rgba(79, 174, 140, 0.2);
+  border-color: #4fae8c;
+}
+
 .loading {
   text-align: center;
   padding: 100px;
@@ -240,12 +268,30 @@ body {
   font-family: 'IBM Plex Mono', monospace;
 }
 
-.discount-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  background: rgba(201, 92, 92, 0.15);
-  color: #c95c5c;
+.contacted-btn {
+  background: #14171d;
+  border: 1px solid #262b36;
+  border-radius: 6px;
+  padding: 5px 12px;
+  color: #767d8c;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.contacted-btn:hover {
+  border-color: #4fae8c;
+  color: #e8e6df;
+}
+
+.contacted-btn.active {
+  background: rgba(79, 174, 140, 0.15);
+  border-color: #4fae8c;
+  color: #4fae8c;
+}
+
+.contacted-row {
+  opacity: 0.6;
 }

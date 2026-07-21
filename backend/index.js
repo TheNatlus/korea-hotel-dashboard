@@ -29,7 +29,7 @@ app.get('/api/hotels', async (req, res) => {
       .select('*', { count: 'exact' });
 
     if (search) {
-      query = query.ilike('hotel_name', `%${search}%`);
+      query = query.ilike('hotel_name', '%' + search + '%');
     }
 
     if (minRating > 0) {
@@ -37,7 +37,7 @@ app.get('/api/hotels', async (req, res) => {
     }
 
     if (cityFilter !== 'all') {
-      query = query.ilike('city', `%${cityFilter}%`);
+      query = query.ilike('city', '%' + cityFilter + '%');
     }
 
     if (typeFilter !== 'all') {
@@ -54,34 +54,40 @@ app.get('/api/hotels', async (req, res) => {
     const end = start + perPage - 1;
     query = query.range(start, end);
 
-    const { data, count, error } = await query;
+    const result = await query;
+    const data = result.data;
+    const count = result.count;
+    const error = result.error;
 
     if (error) throw error;
 
-    const hotels = data.map(row => ({
-      id: row.hotel_id,
-      name: row.hotel_name,
-      address: `${row.addressline1 || ''} ${row.addressline2 || ''}`.trim(),
-      city: row.city,
-      state: row.state,
-      zipcode: row.zipcode,
-      rooms: row.numberrooms || 'N/A',
-      floors: row.numberfloors || 'N/A',
-      yearOpened: row.yearopened || 'N/A',
-      stars: parseFloat(row.star_rating) || 0,
-      rating: parseFloat(row.rating_average) || 0,
-      reviews: parseInt(row.number_of_reviews) || 0,
-      latitude: row.latitude,
-      longitude: row.longitude,
-      photo: row.photo1,
-      accommodationType: row.accommodation_type || 'N/A',
-      chainName: row.chain_name || 'No Chain',
-      phone: row.phone || 'N/A',
-      email: row.email || 'N/A',
-      website: row.website || 'N/A',
-    }));
+    const hotels = data.map(function (row) {
+      return {
+        id: row.hotel_id,
+        name: row.hotel_name,
+        address: (row.addressline1 || '') + ' ' + (row.addressline2 || ''),
+        city: row.city,
+        state: row.state,
+        zipcode: row.zipcode,
+        rooms: row.numberrooms || 'N/A',
+        floors: row.numberfloors || 'N/A',
+        yearOpened: row.yearopened || 'N/A',
+        stars: parseFloat(row.star_rating) || 0,
+        rating: parseFloat(row.rating_average) || 0,
+        reviews: parseInt(row.number_of_reviews) || 0,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        photo: row.photo1,
+        accommodationType: row.accommodation_type || 'N/A',
+        chainName: row.chain_name || 'No Chain',
+        phone: row.phone || 'N/A',
+        email: row.email || 'N/A',
+        website: row.website || 'N/A',
+        contacted: row.contacted || false
+      };
+    });
 
-    res.json({ hotels, total: count });
+    res.json({ hotels: hotels, total: count });
   } catch (error) {
     console.error('Supabase query error:', error.message);
     res.status(500).json({ error: 'Failed to fetch hotels' });
@@ -90,22 +96,44 @@ app.get('/api/hotels', async (req, res) => {
 
 app.get('/api/accommodation-types', async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const result = await supabase
       .from('hotels')
       .select('accommodation_type');
 
-    if (error) throw error;
+    if (result.error) throw result.error;
 
-    const types = [...new Set(data.map(r => r.accommodation_type).filter(Boolean))];
-    res.json({ types });
+    const types = Array.from(new Set(result.data.map(function (r) {
+      return r.accommodation_type;
+    }).filter(Boolean)));
+
+    res.json({ types: types });
   } catch (error) {
     console.error(error.message);
     res.status(500).json({ types: [] });
   }
 });
 
+app.post('/api/hotels/:id/contacted', async (req, res) => {
+  const hotelId = req.params.id;
+  const contacted = req.body.contacted;
+
+  try {
+    const result = await supabase
+      .from('hotels')
+      .update({ contacted: contacted })
+      .eq('hotel_id', hotelId);
+
+    if (result.error) throw result.error;
+
+    res.json({ success: true, contacted: contacted });
+  } catch (error) {
+    console.error('Failed to update contacted status:', error.message);
+    res.status(500).json({ error: 'Failed to update contacted status' });
+  }
+});
+
 app.post('/api/live-pricing', async (req, res) => {
-  const { hotelIds } = req.body;
+  const hotelIds = req.body.hotelIds;
 
   if (!hotelIds || !hotelIds.length) {
     return res.json({ prices: {} });
@@ -127,12 +155,14 @@ app.post('/api/live-pricing', async (req, res) => {
           },
           checkInDate: '2026-07-15',
           checkOutDate: '2026-07-16',
-          hotelId: hotelIds.map(id => parseInt(id))
+          hotelId: hotelIds.map(function (id) {
+            return parseInt(id);
+          })
         }
       },
       {
         headers: {
-          'Authorization': `${process.env.AGODA_SITE_ID}:${process.env.AGODA_API_KEY}`,
+          'Authorization': process.env.AGODA_SITE_ID + ':' + process.env.AGODA_API_KEY,
           'Content-Type': 'application/json',
           'Accept-Encoding': 'gzip,deflate'
         }
@@ -140,7 +170,7 @@ app.post('/api/live-pricing', async (req, res) => {
     );
 
     const prices = {};
-    (response.data.results || []).forEach(hotel => {
+    (response.data.results || []).forEach(function (hotel) {
       prices[hotel.hotelId] = {
         dailyRate: hotel.dailyRate,
         crossedOutRate: hotel.crossedOutRate,
@@ -152,18 +182,18 @@ app.post('/api/live-pricing', async (req, res) => {
       };
     });
 
-    res.json({ prices });
+    res.json({ prices: prices });
   } catch (error) {
-    console.error('Agoda API error:', error.response?.data || error.message);
+    console.error('Agoda API error:', error.response ? error.response.data : error.message);
     res.status(500).json({ error: 'Failed to fetch live pricing', prices: {} });
   }
 });
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, function () {
+  console.log('Server running on port ' + PORT);
 });
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', function (err) {
   console.error('CRASH:', err);
 });
