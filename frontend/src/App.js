@@ -145,6 +145,7 @@ function App() {
                   <th>Stars</th>
                   <th>Rating</th>
                   <th>Reviews</th>
+                  <th>Phone</th>
                   <th>Price/Night</th>
                 </tr>
               </thead>
@@ -168,6 +169,7 @@ function App() {
                     <td><span className="star-badge">{hotel.stars}</span></td>
                     <td><span className="rating-badge">{hotel.rating}</span></td>
                     <td className="numeric">{hotel.reviews}</td>
+                    <td className="numeric">{hotel.phone}</td>
                     <td className="numeric">
                       {hotel.price ? (
                         <>

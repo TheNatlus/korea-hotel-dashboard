@@ -76,8 +76,9 @@ app.get('/api/hotels', async (req, res) => {
       photo: row.photo1,
       accommodationType: row.accommodation_type || 'N/A',
       chainName: row.chain_name || 'No Chain',
-      phone: 'N/A',
-      email: 'N/A',
+      phone: row.phone || 'N/A',
+      email: row.email || 'N/A',
+      website: row.website || 'N/A',
     }));
 
     res.json({ hotels, total: count });
