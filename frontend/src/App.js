@@ -14,6 +14,8 @@ function App() {
   const [accommodationTypes, setAccommodationTypes] = useState([]);
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [editingNotesId, setEditingNotesId] = useState(null);
+  const [notesDraft, setNotesDraft] = useState('');
 
   useEffect(function () {
     fetch(API_URL + '/api/accommodation-types')
@@ -148,6 +150,46 @@ function App() {
     });
   }
 
+  function openNotesEditor(hotelId, currentNotes) {
+    setEditingNotesId(hotelId);
+    setNotesDraft(currentNotes || '');
+  }
+
+  function cancelNotesEditor() {
+    setEditingNotesId(null);
+    setNotesDraft('');
+  }
+
+  function handleNotesDraftChange(e) {
+    setNotesDraft(e.target.value);
+  }
+
+  function saveNotes(hotelId) {
+    var newNotes = notesDraft;
+
+    setHotels(function (prevHotels) {
+      return prevHotels.map(function (h) {
+        if (h.id === hotelId) {
+          var updated = Object.assign({}, h);
+          updated.callNotes = newNotes;
+          return updated;
+        }
+        return h;
+      });
+    });
+
+    fetch(API_URL + '/api/hotels/' + hotelId + '/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callNotes: newNotes })
+    }).catch(function (err) {
+      console.error('Failed to save notes:', err);
+    });
+
+    setEditingNotesId(null);
+    setNotesDraft('');
+  }
+
   return (
     <div className="app">
       <div className="header">
@@ -219,8 +261,8 @@ function App() {
                   <th>Phone</th>
                   <th>Price/Night</th>
                   <th>Maps</th>
-                  <th>Agoda</th>
                   <th>Contacted</th>
+                  <th>Call Notes</th>
                 </tr>
               </thead>
               <tbody>
@@ -236,6 +278,7 @@ function App() {
                   }
 
                   var rowClass = hotel.contacted ? 'contacted-row' : '';
+                  var isEditingNotes = editingNotesId === hotel.id;
 
                   return (
                     <tr key={i} className={rowClass}>
@@ -271,20 +314,37 @@ function App() {
                         {mapLink === '—' && '—'}
                       </td>
                       <td>
-                        {hotel.bookingUrl && (
-                          <a href={hotel.bookingUrl} target="_blank" rel="noopener noreferrer" className="link-badge">
-                            Agoda
-                          </a>
-                        )}
-                        {!hotel.bookingUrl && '—'}
-                      </td>
-                      <td>
                         <button
                           className={hotel.contacted ? 'contacted-btn active' : 'contacted-btn'}
                           onClick={function () { toggleContacted(hotel.id, hotel.contacted); }}
                         >
                           {hotel.contacted ? 'Contacted' : 'Mark Contacted'}
                         </button>
+                      </td>
+                      <td className="notes-cell">
+                        {isEditingNotes && (
+                          <div className="notes-editor">
+                            <textarea
+                              className="notes-textarea"
+                              value={notesDraft}
+                              onChange={handleNotesDraftChange}
+                              placeholder="What happened on the call..."
+                              autoFocus
+                            />
+                            <div className="notes-actions">
+                              <button className="notes-save" onClick={function () { saveNotes(hotel.id); }}>Save</button>
+                              <button className="notes-cancel" onClick={cancelNotesEditor}>Cancel</button>
+                            </div>
+                          </div>
+                        )}
+                        {!isEditingNotes && (
+                          <button
+                            className="notes-preview"
+                            onClick={function () { openNotesEditor(hotel.id, hotel.callNotes); }}
+                          >
+                            {hotel.callNotes ? hotel.callNotes : '+ Add notes'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

@@ -83,7 +83,8 @@ app.get('/api/hotels', async (req, res) => {
         phone: row.phone || 'N/A',
         email: row.email || 'N/A',
         website: row.website || 'N/A',
-        contacted: row.contacted || false
+        contacted: row.contacted || false,
+        callNotes: row.call_notes || ''
       };
     });
 
@@ -129,6 +130,25 @@ app.post('/api/hotels/:id/contacted', async (req, res) => {
   } catch (error) {
     console.error('Failed to update contacted status:', error.message);
     res.status(500).json({ error: 'Failed to update contacted status' });
+  }
+});
+
+app.post('/api/hotels/:id/notes', async (req, res) => {
+  const hotelId = req.params.id;
+  const callNotes = req.body.callNotes;
+
+  try {
+    const result = await supabase
+      .from('hotels')
+      .update({ call_notes: callNotes })
+      .eq('hotel_id', hotelId);
+
+    if (result.error) throw result.error;
+
+    res.json({ success: true, callNotes: callNotes });
+  } catch (error) {
+    console.error('Failed to update call notes:', error.message);
+    res.status(500).json({ error: 'Failed to update call notes' });
   }
 });
 
