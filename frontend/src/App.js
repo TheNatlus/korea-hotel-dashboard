@@ -48,37 +48,6 @@ function App() {
         setHotels(data.hotels);
         setTotalCount(data.total);
         setLoading(false);
-
-        var hotelIds = data.hotels.map(function (h) {
-          return h.id;
-        }).filter(Boolean);
-
-        if (hotelIds.length > 0) {
-          fetch(API_URL + '/api/live-pricing', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ hotelIds: hotelIds })
-          })
-            .then(function (res) {
-              return res.json();
-            })
-            .then(function (priceData) {
-              setHotels(function (prevHotels) {
-                return prevHotels.map(function (h) {
-                  var priceInfo = priceData.prices[h.id] || {};
-                  var updated = Object.assign({}, h);
-                  updated.price = priceInfo.dailyRate || null;
-                  updated.crossedOutRate = priceInfo.crossedOutRate || null;
-                  updated.discountPercentage = priceInfo.discountPercentage || 0;
-                  updated.bookingUrl = priceInfo.landingURL || null;
-                  return updated;
-                });
-              });
-            })
-            .catch(function (err) {
-              console.error('Pricing fetch failed:', err);
-            });
-        }
       })
       .catch(function (err) {
         console.error(err);
@@ -259,7 +228,6 @@ function App() {
                   <th>Rating</th>
                   <th>Reviews</th>
                   <th>Phone</th>
-                  <th>Price/Night</th>
                   <th>Maps</th>
                   <th>Contacted</th>
                   <th>Call Notes</th>
@@ -267,11 +235,6 @@ function App() {
               </thead>
               <tbody>
                 {hotels.map(function (hotel, i) {
-                  var priceCell = '—';
-                  if (hotel.price) {
-                    priceCell = '$' + hotel.price;
-                  }
-
                   var mapLink = '—';
                   if (hotel.name) {
                     mapLink = getMapUrl(hotel.name, hotel.address, hotel.city);
@@ -292,19 +255,6 @@ function App() {
                       <td><span className="rating-badge">{hotel.rating}</span></td>
                       <td className="numeric">{hotel.reviews}</td>
                       <td className="numeric">{hotel.phone}</td>
-                      <td className="numeric">
-                        {hotel.price && (
-                          <span>
-                            {priceCell}
-                            {hotel.discountPercentage > 0 && (
-                              <span className="discount-badge">
-                                {'-' + hotel.discountPercentage + '%'}
-                              </span>
-                            )}
-                          </span>
-                        )}
-                        {!hotel.price && '—'}
-                      </td>
                       <td>
                         {mapLink !== '—' && (
                           <a href={mapLink} target="_blank" rel="noopener noreferrer" className="link-badge">
